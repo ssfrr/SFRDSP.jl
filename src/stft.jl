@@ -85,8 +85,10 @@ function stft2(x, nfft, hop=nfft÷2;
     elseif window isa AbstractArray
         @assert length(window) == nfft
         window
-    else
+    elseif window === nothing
         nothing
+    else
+        throw(ArgumentError("window must be an Array, Function, or `nothing`"))
     end
 
     xbuf = zeros(eltype(x), nfft)
@@ -108,7 +110,9 @@ function stft2(x, nfft, hop=nfft÷2;
     for c in 1:M
         fill!(xbuf, zero(eltype(xbuf)))
         # copy the positive half to the beginning of the fft buffer
-        npos = min(nfft2, L-xidx+1)
+        # note the center of the window could be past the last sample
+        # of `x`, in which case `npos` should be 0.
+        npos = max(0, min(nfft2, L-xidx+1))
         copyto!(xbuf, 1, x, xidx, npos)
         # copy the negative half to the end of the fft buffer
         nneg = min(nfft2, xidx-1)

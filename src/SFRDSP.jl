@@ -3,6 +3,7 @@ module SFRDSP
 using FFTW
 using DSP
 using Statistics
+using LinearAlgebra
 
 export stft2, istft2
 export cubic
