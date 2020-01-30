@@ -40,7 +40,7 @@ Note that the round-trip may introduce some zero-padding at the end.
 # in the STFT at the beginning and end for truncated signals
 """
     stft2(x, nfft, hop=nfft÷2;
-          window=nothing,
+          window=rect,
           demod=false)
 
 Perform a short-time fourier transform on a real-valued time signal `x`. The
@@ -64,7 +64,7 @@ result is a complex-valued matrix of dimension:
 $stft_docs
 """
 function stft2(x, nfft, hop=nfft÷2;
-               window=nothing,
+               window=rect,
                demod=false)
     # we could handle this, but it's simpler not to, and this is the common case
     @assert iseven(nfft)
@@ -85,10 +85,8 @@ function stft2(x, nfft, hop=nfft÷2;
     elseif window isa AbstractArray
         @assert length(window) == nfft
         window
-    elseif window === nothing
-        nothing
     else
-        throw(ArgumentError("window must be an Array, Function, or `nothing`"))
+        throw(ArgumentError("window must be an Array or Function"))
     end
 
     xbuf = zeros(eltype(x), nfft)
@@ -116,7 +114,12 @@ function stft2(x, nfft, hop=nfft÷2;
         copyto!(xbuf, 1, x, xidx, npos)
         # copy the negative half to the end of the fft buffer
         nneg = min(nfft2, xidx-1)
-        copyto!(xbuf, nfft-nneg+1, x, xidx-nneg, nneg)
+        # note that if xidx is past the end of `x`, we don't actually have
+        # nneg samples available to copy. it's still useful to compute the
+        # indices for the copying though
+        copystart = xidx-nneg
+        ncopy = max(0, min(nneg, L-copystart+1))
+        copyto!(xbuf, nfft-nneg+1, x, copystart, ncopy)
         # zero-out any parts of the buffer that weren't filled. This should
         # only happen at the beginning and end of the process
         # xbuf[npos+1:end-nneg] .= zero(eltype(xbuf))
@@ -144,6 +147,11 @@ end
 
 
 """
+    istft2(X, nfft, hop=nfft÷2;
+           out_nfft=nfft,
+           out_hop=Int(out_nfft * hop / nfft),
+           window=rect,
+           demod=false)
 Perform an inverse short-time fourier transform on the complex-valued matrix
 `X`.
 
@@ -172,7 +180,7 @@ function istft2(X, nfft, hop=nfft÷2;
                 # compatible. TODO: give a better error message or handle this
                 # more gracefully
                 out_hop=Int(out_nfft * hop / nfft),
-                window=nothing,
+                window=rect,
                 demod=false)
     # we could handle this case, but it's simpler not to
     @assert iseven(nfft)
@@ -190,18 +198,19 @@ function istft2(X, nfft, hop=nfft÷2;
 
     # TODO: if the element type is e.g. Float32, we should use the same for
     # the window
+    # TODO: scaling should probably be handled more automatically, and
+    # also we should handle the non-COLA case. Also we're not scaling
+    # the windows above because we're assuming they're COLA and add to 1
+    # ALSO there are still some artifacts at the very beginning and end,
+    # where the samples don't get the right number of windows adding up,
+    # so the scale factor is off.
     win = if window isa Function
         window(out_nfft, zerophase=true)
     elseif window isa AbstractArray
+        @assert length(window) == out_nfft
         window
     else
-        # TODO: this probably needs to be fixed for out_nfft != nfft, and
-        # also we should handle the non-COLA case. Also we're not scaling
-        # the windows above because we're assuming they're COLA and add to 1
-        # ALSO there are still some artifacts at the very beginning and end,
-        # where the samples don't get the right number of windows adding up,
-        # so the scale factor is off.
-        fill(hop/nfft, out_nfft)
+
     end
 
     if demod
