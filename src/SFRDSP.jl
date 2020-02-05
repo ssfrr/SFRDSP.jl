@@ -9,10 +9,12 @@ export stft2, istft2
 export cubic
 export xcorr2, circ_xcorr2
 export circ_smooth, circ_resample
+export noise_psd
 
 include("stft.jl")
 include("interp.jl")
 include("xcorr.jl")
 include("circ.jl")
+include("noise_psd.jl")
 
 end # module
