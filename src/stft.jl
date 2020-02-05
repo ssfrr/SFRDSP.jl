@@ -139,7 +139,7 @@ function stft2(x, nfft, hop=nfft÷2;
         ω = range(0, π, length=N)
         # TODO we could do this without allocating a whole copy of X by doing
         # the multipliation frame-wise
-        X *= exp.(-im .* n' .* ω)
+        X .*= exp.(-im .* n' .* ω)
     end
 
     X
@@ -222,7 +222,7 @@ function istft2(X, nfft, hop=nfft÷2;
         ω = range(0, π, length=N)
         # TODO we could do this without allocating a whole copy of X by doing
         # the multipliation frame-wise
-        X *= exp.(im .* n' .* ω)
+        X .*= exp.(im .* n' .* ω)
     end
 
     # this is probably pretty close to supporting nfft != N, but not really

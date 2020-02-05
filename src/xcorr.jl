@@ -1,5 +1,5 @@
 """
-    circ_xcorr2(u,v; norm=true, center=true)
+    circ_xcorr2(u,v; norm=true, center=true, phat=false)
 
 Perform circular cross-correlation using the FFT algorithm, shifting `v`
 relative to `u`, so delaying `u` will shift the result to the right. Index 1
@@ -8,8 +8,11 @@ corresponds to zero lag.
 Another interpretation is that index of the peak of this cross correlation
 (minus 1) represents the delay of `u` with respect to `v`, or alternatively the
 position of `v` within `u`.
+
+If `phat=true`, this implements GCC-PHAT, where the amplitudes are set to one
+and only the phases are used.
 """
-function circ_xcorr2(u,v; norm=true, center=true)
+function circ_xcorr2(u,v; norm=true, center=true, phat=false)
     L = length(u)
     @assert length(v) == L
     if center
@@ -19,7 +22,11 @@ function circ_xcorr2(u,v; norm=true, center=true)
     p = plan_rfft(u)
     U = p*u
     V = p*v
-    U .*= conj.(V)
+    if phat
+        @. U = U * conj(V) / (abs(U) * abs(V))
+    else
+        @. U *= conj(V)
+    end
     result = irfft(U, L)
 
     if norm
@@ -42,12 +49,16 @@ to `u`, so delaying `u` will shift the result to the right. Index
 
 If `unbiased` is true (the default) then this will compensate for lost energy
 due to lags where the signals don't entirely overlap.
+
+If `phat=true`, this implements GCC-PHAT, where the amplitudes are set to one
+and only the phases are used.
 """
 function xcorr2(u,v;
                 lagbounds=(-length(v)+1, length(u)-1),
                 unbiased=true,
                 norm=true,
-                center=true)
+                center=true,
+                phat=false)
     # TODO make sure it works for zero-length vectors
     # TODO: handle minlag == maxlag
     # TODO: really `unbiased` is a form of normalization, where we normalize
@@ -93,7 +104,11 @@ function xcorr2(u,v;
     p = plan_rfft(upad)
     uspec = p * upad
     vspec = p * vpad
-    uspec .*= conj.(vspec)
+    if phat
+        @. uspec *= conj(vspec) / (abs(uspec) * abs(vspec))
+    else
+        @. uspec *= conj(vspec)
+    end
 
     result = resize!(irfft(uspec, nfft), nlags)
 
