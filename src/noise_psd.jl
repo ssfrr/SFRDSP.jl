@@ -7,7 +7,8 @@ or an STFT `X` using minimum statistics. This is similar to the approach in [1],
 smoothed with a gaussian window `smoothing` seconds long. Genrally longer windows will provide a less-biased estimate, but it must be short enough that there will be some regions of the signal where the the smoothing window has none of the target signal in it.
 
 `samplerate` is used for time-domain signals, vs `framerate` for STFTs. You can
-convert between them with `framerate = samplerate / hop`.
+convert between them with `framerate = samplerate / hop`. You can set the
+samplerate/framerate to 1 to give smoothing in samples of frames, respectively.
 
 The result will be of size `nfft÷2+1` for a time signal `x`, or the same height
 as an STFT `X`.
@@ -29,7 +30,12 @@ function noise_psd(X::AbstractMatrix{<:Complex}, smoothing, framerate)
     win = gaussian(L, 0.14)
     win ./= sum(x->x^2, win)
     map(1:size(X, 1)) do band
-        sm = conv(abs2.(X[band, :]), win)
+        # we skip the last STFT frame because it is often lower-power due to
+        # being only partially-filled. Note that it would be more correct to
+        # actually take the STFT hop and window sizes into account, but in
+        # in practice we're often using 50% overlap and this effect shouldn't be
+        # that important.
+        sm = conv(abs2.(X[band, 1:end-1]), win)
         minimum(sm[L:end-L+1])
     end
 end
