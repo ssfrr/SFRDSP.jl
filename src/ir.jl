@@ -3,8 +3,9 @@
     fit_ir(x::SampleBuf, nfft, max_decay)
 
 Analyze the given impulse response `x` at sample rate `fs` by curve fitting in
-each frequency band. The impulse response audio should be relatively clean (not
-too much nonstationary background noise).
+each frequency band. The impulse response audio should be relatively clean (the
+impulse should be the time-domain peak, and there should not be too much
+nonstationary background noise).
 
 `nfft` gives the number of frequency bands that will be used.
 
