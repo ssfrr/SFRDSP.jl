@@ -11,7 +11,7 @@ export cubic
 export xcorr2, circ_xcorr2
 export circ_smooth, circ_resample
 export noise_psd
-export fit_ir
+export fit_ir, IRFitException
 
 include("stft.jl")
 include("interp.jl")

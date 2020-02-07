@@ -20,17 +20,26 @@ Returns a vector of named tuples for each band containing:
     - `rt60` - RT60 for each band (in seconds)
     - `drr` - Direct-to-Reverberant Ratio for each band (in dB)
 
-If the curve fit does not converge the RT60 and DRR may be `nothing`.
+If the curve fit does not converge the values may be `missing`.
 """
 fit_ir(x::SampleBuf, nfft, max_decay) =
     fit_ir(x.data, samplerate(x), nfft, max_decay)
+
+struct IRFitException <: Exception
+    msg::String
+end
+
+Base.showerror(io::IO, e::IRFitException) = print(io, e.msg)
 
 function fit_ir(x::AbstractVector, fs, nfft, max_decay)
     maxidx = findmax(abs2.(x))[2]
     # now we take the STFT to generate our frequency bands
     hop = nfft÷2
     if maxidx <= 2hop
-        throw(ErrorException("IR Fitting needs at least $(2hop) samples (2 hops) prior to peak (at $maxidx). Provide more signal or decrease your hop size"))
+        throw(IRFitException("IR Fitting needs at least $(2hop) samples (2 hops) prior to peak (at $maxidx). Provide more signal or decrease your hop size"))
+    end
+    if maxidx >= length(x) - max_decay*fs
+        throw(IRFitException("Signal peak is too close to the end of the signal"))
     end
     # set things up so that the 2nd STFT frame is centered on the peak.
     # this also ensures that no padding is present in that window
@@ -41,18 +50,26 @@ function fit_ir(x::AbstractVector, fs, nfft, max_decay)
     # TODO: we could probably re-structure this to also allow for nmax
     # starting too low, but then it seems less guaranteed that it will
     # converge
-    nmax_init = round(Int, max_decay*fs/hop)+npeak
+    nmax_init = round(Int, max_decay*fs/hop)
 
     noise = 10log10.(mean(specpow[:, nmax_init:end], dims=2))
 
     map(1:size(specpow, 1)) do k
+        converged = false
         # The peak index should be 2, but in practice it seems delayed for some
         # frequencies. All the following analysis is performed relative to the
         # peak position
         npeak = findmax(logspecpow[k, :])[2]
-        if npeak == 1
-            throw(ErrorException("Bin $k has a peak that's too early, this function should be modified to add more space before the time-domain peak"))
+        # if the peak is too far delayed from the time-domain peak, it's
+        # probably garbage. 10 is pretty arbitrarily-chosen.
+        if npeak > 10
+            peakdelay = round(Int,(npeak-2)*hop/fs*1000)
+            # @warn "Within-band peak $(peakdelay)ms from time-domain peak, skipping"
+            @goto cleanup
         end
+        # we'll use a fixed endpoint rather then making it relative to the
+        # per-band peak so that if the peak gets found very late in the signal
+        # it just won't get used.
         nmax = nmax_init
         # from Traer they say the decay starts after about 20ms. We want to make
         # sure we're in the exponential decay portion, so we wayt 50ms  after
@@ -69,7 +86,6 @@ function fit_ir(x::AbstractVector, fs, nfft, max_decay)
         # figure out where the decay hits the noise floor. Initially the fitted
         # data will include the noise that's after the decay, so we'll
         # iteratively shorten the region we're fitting over until it converged.
-        converged = false
         local L
 
         while true
@@ -102,20 +118,30 @@ function fit_ir(x::AbstractVector, fs, nfft, max_decay)
         # details at:
         # https://ccrma.stanford.edu/~jos/sasp/Quadratic_Interpolation_Spectral_Peaks.html
 
-        peakpow, peakpos = let
+        peakpow, peakpos = if npeak > 1
             α, β, γ = specpow[k, (-1:1).+npeak]
             p = 0.5 * (α-γ)/(α-2β+γ)
             pow = β - 0.25 * (α-γ)*p
             (10log10(pow), p+npeak)
+        else
+            # this probably means the data isn't good for this band
+            (10log10(specpow[k, npeak]), npeak)
         end
 
-         # the peak is in the 2nd STFT frame, so that's the part of the linear
-         # fit that we compare to for the peak SNR
-        (freq=(k-1)/nfft*fs,
-         noise_pow=noise[k], # noise power
-         peak_snr=peakpow - noise[k], # peak SNR
-         drr=converged ? peakpow - (L[2] + peakpos*L[1]) :
-                         nothing, # DRR
-         rt60=converged ? -60/L[1]*hop/fs : nothing) # RT60
+        @label cleanup
+        freq=(k-1)/nfft*fs
+        if converged
+            (freq=(k-1)/nfft*fs,
+             noise_pow=noise[k], # noise power
+             peak_snr=peakpow - noise[k], # peak SNR
+             drr=peakpow - (L[2] + peakpos*L[1]), # DRR
+             rt60=-60/L[1]*hop/fs) # RT60
+        else
+            (freq=(k-1)/nfft*fs,
+             noise_pow=missing, # noise power
+             peak_snr=missing, # peak SNR
+             drr=missing, # DRR
+             rt60=missing) # RT60
+        end
     end
 end
