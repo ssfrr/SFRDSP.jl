@@ -48,17 +48,32 @@ to `u`, so delaying `u` will shift the result to the right. Index
 `-lagbounds[1]+1` (default `length(v)`) corresponds to zero lag.
 
 If `unbiased` is true (the default) then this will compensate for lost energy
-due to lags where the signals don't entirely overlap.
+due to lags where the signals don't entirely overlap. This is generally appropriate
+when the target signals being correlated occupy a substantial fraction of `u` and `v`.
 
 If `phat=true`, this implements GCC-PHAT, where the amplitudes are set to one
 and only the phases are used.
+
+`plantype` can be set to one of:
+    - `FFTW.ESTIMATE` (the default)
+    - `FFTW.MEASURE`
+    - `FFTW.PATIENT`
+    - `FFTW.EXHAUSTIVE`
+
+See the FFTW documentation for more information on these settings. The plan information
+is saved internally within FFTW on each session, so you only pay the cost of planning
+the first time `xcorr2` is called.
+
+!!! WARNING: Currently (Feb 2020) I get very long pauses and sometimes hangs with any
+plan other than `FFTW.ESTIMATE`
 """
 function xcorr2(u,v;
                 lagbounds=(-length(v)+1, length(u)-1),
                 unbiased=true,
                 norm=true,
                 center=true,
-                phat=false)
+                phat=false,
+                plantype=FFTW.ESTIMATE)
     # TODO make sure it works for zero-length vectors
     # TODO: handle minlag == maxlag
     # TODO: really `unbiased` is a form of normalization, where we normalize
@@ -66,10 +81,6 @@ function xcorr2(u,v;
     # another normalization approach where we normalize each lag by geometric
     # mean (similar to the current `norm=true` but we only include the parts
     # that overlap)
-    if center
-        u .-= mean(u)
-        v .-= mean(v)
-    end
     su = length(u)
     sv = length(v)
     minlag, maxlag = lagbounds
@@ -87,10 +98,10 @@ function xcorr2(u,v;
         su, sv
     end
     nlags = maxlag - minlag + 1
-    # TODO: we should use `nextfastfft`
-    nfft = max(su - minlag, sv + maxlag)
-    upad = zeros(eltype(u), nfft)
-    vpad = zeros(eltype(v), nfft)
+    # using nextfastfft here gives about a 10x speedup for largeish problems (L=400k)
+    nfft = nextfastfft(max(su - minlag, sv + maxlag))
+    upad = zeros(float(eltype(u)), nfft)
+    vpad = zeros(float(eltype(v)), nfft)
 
     copyto!(upad, 1, u, 1, su)
     # pre-shift `v` to correspond to the `minlag` position
@@ -101,7 +112,17 @@ function xcorr2(u,v;
         copyto!(vpad, minlag+1, v, 1, sv)
     end
 
-    p = plan_rfft(upad)
+    if center
+        upad .-= mean(u)
+        vpad .-= mean(v)
+    end
+    normval = if norm
+        sqrt(sum(abs2, upad)*sum(abs2, vpad))
+    else
+        one(eltype(upad))
+    end
+
+    p = plan_rfft(upad; flags=plantype | FFTW.DESTROY_INPUT)
     uspec = p * upad
     vspec = p * vpad
     if phat
@@ -110,7 +131,7 @@ function xcorr2(u,v;
         @. uspec *= conj(vspec)
     end
 
-    result = resize!(irfft(uspec, nfft), nlags)
+    result = resize!(inv(p) * uspec, nlags)
 
     if unbiased
         # maximum overlap when lag == 0
@@ -130,9 +151,7 @@ function xcorr2(u,v;
     end
 
     if norm
-        # TODO: this could be a little more efficient by combining with the
-        # unbiasing and/or only applying it to the shortest of u, v, and result
-        result ./= sqrt(sum(x->x^2, u)*sum(x->x^2, v))
+        result ./= normval
     end
     result
 end

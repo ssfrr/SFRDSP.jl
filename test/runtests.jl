@@ -26,4 +26,40 @@ using DSP
             @test x2 ≈ scale * [x; zeros(length(x2)-length(x))]
         end
     end
+
+    @testset "xcorr2" begin
+        # setting the length of `u` and `v` to 6 forces the desired nfft to be 11,
+        # which gets bumped to 12 because of `nextfastfft`, so these test that all
+        # the index twiddling still holds.
+        @testset "basic cross-correlation" begin
+            @test xcorr2([1; zeros(5)],
+                         [1; zeros(5)];
+                         center=false,
+                         unbiased=false) ≈ [zeros(5); 1; zeros(5)]
+            @test xcorr2([zeros(5); 1],
+                         [1; zeros(5)];
+                         center=false,
+                         unbiased=false) ≈ [zeros(10); 1]
+            @test xcorr2([1; zeros(5)],
+                         [zeros(5); 1];
+                         center=false,
+                         unbiased=false) ≈ [1; zeros(10)]
+        end
+        @testset "xcorr with lagbounds" begin
+            u = [1; zeros(5)]
+            v = [1; zeros(5)]
+            @test xcorr2(u,v; center=false, lagbounds=(-1,1)) ≈ [0, 1, 0]
+        end
+        @testset "xcorr with short u" begin
+            u = [1, 0]
+            v = [1, 0, 0]
+            @test xcorr2(u,v; center=false, unbiased=false) ≈ [0, 0, 1, 0]
+        end
+        @testset "xcorr with short v" begin
+            u = [1, 0, 0]
+            v = [1, 0]
+            @test xcorr2(u,v; center=false, unbiased=false) ≈ [0, 1, 0, 0]
+        end
+    end
+
 end
