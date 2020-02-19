@@ -62,4 +62,15 @@ using DSP
         end
     end
 
+    @testset "padding" begin
+        @test pad([1, 2, 3], :reflect_at, 2, 2) == [3,2,1,2,3,2,1]
+    end
+
+    @testset "resample" begin
+        x = randn(1000)
+        @test length(resample2(x, 2)) == 2000
+        @test length(resample2(x, 0.5)) == 500
+
+    end
+
 end
