@@ -132,10 +132,13 @@ function xcorr2(u,v;
     p = plan_rfft(upad; flags=plantype | FFTW.DESTROY_INPUT)
     uspec = p * upad
     vspec = p * vpad
-    if phat
-        @. uspec *= conj(vspec) / (abs(uspec) * abs(vspec))
-    else
-        @. uspec *= conj(vspec)
+    magthresh = sqrt(eps())
+    for i in eachindex(uspec)
+        @inbounds uspec[i] *= conj(vspec[i])
+        if phat
+            @inbounds mag = sqrt(abs2(uspec[i]) * abs2(vspec[i]))
+            @inbounds mag > magthresh && (uspec[i] /= norm)
+        end
     end
 
     result = resize!(inv(p) * uspec, nlags)
