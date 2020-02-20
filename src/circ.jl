@@ -19,15 +19,21 @@ function circ_conv(u, v)
     lu = length(u)
     lv = length(v)
     nfft = nextfastfft(max(lu, lv))
+    # always copy `u` because we re-use this buffer for the result
+    # TODO: add zero-padding to `pad` function and use here
     upad = similar(u, nfft)
     copyto!(upad, u)
     for i in lu+1:nfft
         @inbounds upad[i] = zero(eltype(u))
     end
-    vpad = similar(v, nfft)
-    copyto!(vpad, v)
-    for i in lv+1:nfft
-        @inbounds vpad[i] = zero(eltype(v))
+    vpad = if lv != nfft
+        similar(v, nfft)
+        copyto!(vpad, v)
+        for i in lv+1:nfft
+            @inbounds vpad[i] = zero(eltype(v))
+        end
+    else
+        v
     end
     p = plan_rfft(upad)
     U = p*upad
