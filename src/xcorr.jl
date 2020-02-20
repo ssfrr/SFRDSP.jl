@@ -52,6 +52,8 @@ to `u`, so delaying `u` will shift the result to the right. Index
 If `unbiased` is true (the default) then this will compensate for lost energy
 due to lags where the signals don't entirely overlap. This is generally appropriate
 when the target signals being correlated occupy a substantial fraction of `u` and `v`.
+It also helps keep the noise power constant for the uncorrelated lags. Note that there
+may be situations where this is not appropriate - more investigation needs to be done.
 
 If `phat=true`, this implements GCC-PHAT, where the amplitudes are set to one
 and only the phases are used.
