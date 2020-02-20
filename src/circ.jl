@@ -8,7 +8,34 @@ function circ_smooth(v, L=501)
     N = length(v)
     win = gaussian(N, 0.15*L/N; zerophase=true)
     win ./= sum(win)
-    irfft(rfft(v) .* rfft(win), N)
+    circ_conv(v, win)
+end
+
+"""
+Perform circular convolution using the FFT algorithm. The result length will be the
+greater of the arguments.
+"""
+function circ_conv(u, v)
+    lu = length(u)
+    lv = length(v)
+    nfft = nextfastfft(max(lu, lv))
+    upad = similar(u, nfft)
+    copyto!(upad, u)
+    for i in lu+1:nfft
+        @inbounds upad[i] = zero(eltype(u))
+    end
+    vpad = similar(v, nfft)
+    copyto!(vpad, v)
+    for i in lv+1:nfft
+        @inbounds vpad[i] = zero(eltype(v))
+    end
+    p = plan_rfft(upad)
+    U = p*upad
+    V = p*vpad
+    @. U *= V
+    # I think the arguments for this are reversed in the FFTW docs
+    ldiv!(upad, p, U)
+    resize!(upad, max(lu,lv))
 end
 
 """
