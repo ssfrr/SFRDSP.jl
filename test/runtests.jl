@@ -34,8 +34,7 @@ using DSP
         @testset "basic cross-correlation" begin
             @test xcorr2([1; zeros(5)],
                          [1; zeros(5)];
-                         center=false,
-                         unbiased=false) ≈ [1; zeros(10)]
+                         center=false) ≈ [1; zeros(10)]
             @test xcorr2([zeros(5); 1],
                          [1; zeros(5)];
                          center=false,

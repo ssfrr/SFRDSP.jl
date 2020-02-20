@@ -119,13 +119,6 @@ function xcorr2(u,v;
         one(eltype(upad))
     end
 
-    # if unbiased
-    #     minlag_norm =
-    #     maxlag_norm =
-    #     biasnorm = map(minlag:maxlag) do lag
-    #     end
-    # end
-
     p = plan_rfft(upad; flags=plantype | FFTW.DESTROY_INPUT)
     uspec = p * upad
     vspec = p * vpad
@@ -150,22 +143,27 @@ function xcorr2(u,v;
     resize!(result, nlags)
 
     if unbiased
+        # this power is empirical - I haven't throught through whether
+        # there's a theoretical reason, or whether it is signal-dependent (it
+        # probably depends on how correlated the signals are)
+        # this is probably another good reason to normalize each lag based
+        # on the actual energy in the overlap instead of this estimate
         # maximum overlap when lag == 0
         maxoverlap = min(su, sv)
-        for (i, lag) in enumerate(UnitRange(lagbounds...))
-            overlap = if lag < 0
-                max(0, maxoverlap+lag)
-            elseif lag < su - sv
+        for lag in 1:maxlag
+            overlap = if lag < su - sv
                 maxoverlap
             else
                 max(0, maxoverlap - lag + su - sv)
             end
             if overlap > 0
-                # this power is empirical - I haven't throught through whether
-                # there's a theoretical reason, or whether it is signal-dependent.
-                # this is probably another good reason to normalize each lag based
-                # on the actual energy in the overlap instead of this estimate
-                result[i] *= (maxoverlap / overlap)^0.5
+                result[lag+1] *= (maxoverlap / overlap)^0.5
+            end
+        end
+        for lag in minlag:-1
+            overlap = max(0, maxoverlap+lag)
+            if overlap > 0
+                result[end+lag+1] *= (maxoverlap / overlap)^0.5
             end
         end
     end
