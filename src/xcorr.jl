@@ -41,7 +41,9 @@ end
            lagbounds=(-length(v)+1, length(u)-1),
            unbiased=true,
            norm=true,
-           center=true)
+           center=true,
+           phat=false,
+           plantype=FFTW.ESTIMATE)
 
 Perform linear cross-correlation using the FFT algorithm, shifting `v` relative
 to `u`, so delaying `u` will shift the result to the right. Index
@@ -98,7 +100,6 @@ function xcorr2(u,v;
         su, sv
     end
     nlags = maxlag - minlag + 1
-    # using nextfastfft here gives about a 10x speedup for largeish problems (L=400k)
     nfft = nextfastfft(max(su - minlag, sv + maxlag))
     upad = zeros(float(eltype(u)), nfft)
     vpad = zeros(float(eltype(v)), nfft)
@@ -113,10 +114,14 @@ function xcorr2(u,v;
     end
 
     if center
-        upad .-= mean(u)
-        vpad .-= mean(v)
+        umean = mean(u)
+        upad[-minlag+1:sv] .-= umean
+        upad[1:-minlag] .-= umean
+        vpad[1:sv] .-= mean(v)
     end
-    normval = if norm
+    # we don't normalize if we're using GCC-PHAT because we set all the amplitudes
+    # to 1
+    normval = if norm && !phat
         sqrt(sum(abs2, upad)*sum(abs2, vpad))
     else
         one(eltype(upad))
@@ -145,7 +150,11 @@ function xcorr2(u,v;
                 max(0, maxoverlap - lag + su - sv)
             end
             if overlap > 0
-                result[i] *= maxoverlap / overlap
+                # this power is empirical - I haven't throught through whether
+                # there's a theoretical reason, or whether it is signal-dependent.
+                # this is probably another good reason to normalize each lag based
+                # on the actual energy in the overlap instead of this estimate
+                result[i] *= (maxoverlap / overlap)^0.5
             end
         end
     end
