@@ -46,8 +46,8 @@ end
            plantype=FFTW.ESTIMATE)
 
 Perform linear cross-correlation using the FFT algorithm, shifting `v` relative
-to `u`, so delaying `u` will shift the result to the right. Index
-`-lagbounds[1]+1` (default `length(v)`) corresponds to zero lag.
+to `u`, so delaying `u` will shift the result to the right. Index `1` corresponds to
+zero lag, with negative lag wrapped to the end of the result vector.
 
 If `unbiased` is true (the default) then this will compensate for lost energy
 due to lags where the signals don't entirely overlap. This is generally appropriate
@@ -105,18 +105,10 @@ function xcorr2(u,v;
     vpad = zeros(float(eltype(v)), nfft)
 
     copyto!(upad, 1, u, 1, su)
-    # pre-shift `v` to correspond to the `minlag` position
-    if minlag < 0
-        copyto!(vpad, 1, v, -minlag+1, sv+minlag)
-        copyto!(vpad, nfft+minlag+1, v, 1, -minlag)
-    else
-        copyto!(vpad, minlag+1, v, 1, sv)
-    end
+    copyto!(vpad, 1, v, 1, sv)
 
     if center
-        umean = mean(u)
-        upad[-minlag+1:sv] .-= umean
-        upad[1:-minlag] .-= umean
+        upad[1:su] .-= mean(u)
         vpad[1:sv] .-= mean(v)
     end
     # we don't normalize if we're using GCC-PHAT because we set all the amplitudes
@@ -127,16 +119,35 @@ function xcorr2(u,v;
         one(eltype(upad))
     end
 
+    # if unbiased
+    #     minlag_norm =
+    #     maxlag_norm =
+    #     biasnorm = map(minlag:maxlag) do lag
+    #     end
+    # end
+
     p = plan_rfft(upad; flags=plantype | FFTW.DESTROY_INPUT)
     uspec = p * upad
     vspec = p * vpad
-    if phat
-        @. uspec *= conj(vspec) / (abs(uspec) * abs(vspec))
-    else
-        @. uspec *= conj(vspec)
+    magthresh = sqrt(eps())
+    for i in eachindex(uspec)
+        @inbounds uspec[i] *= conj(vspec[i])
+        if phat
+            @inbounds mag = sqrt(abs2(uspec[i]) * abs2(vspec[i]))
+            mag > magthresh && (uspec[i] /= norm)
+        end
     end
 
-    result = resize!(inv(p) * uspec, nlags)
+    result = inv(p) * uspec
+    # remove any padding and aliased data from the middle of the buffer
+    # for lagbounds=(-3,4) the result would look like:
+    # [0PPPPNNN] (0 is 0-lag, P for positive, N for negative)
+    # TODO: support fully positive and fully negative lagbounds
+    @assert minlag <= 0
+    @assert maxlag >= 0
+    @assert length(result) == nfft
+    copyto!(result, maxlag+2, result, nfft+minlag+1, -minlag)
+    resize!(result, nlags)
 
     if unbiased
         # maximum overlap when lag == 0

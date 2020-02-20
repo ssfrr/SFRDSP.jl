@@ -35,30 +35,32 @@ using DSP
             @test xcorr2([1; zeros(5)],
                          [1; zeros(5)];
                          center=false,
-                         unbiased=false) ≈ [zeros(5); 1; zeros(5)]
+                         unbiased=false) ≈ [1; zeros(10)]
             @test xcorr2([zeros(5); 1],
                          [1; zeros(5)];
                          center=false,
-                         unbiased=false) ≈ [zeros(10); 1]
+                         unbiased=false) ≈ [zeros(5); 1; zeros(5)]
             @test xcorr2([1; zeros(5)],
                          [zeros(5); 1];
                          center=false,
-                         unbiased=false) ≈ [1; zeros(10)]
+                         unbiased=false) ≈ [zeros(6); 1; zeros(4)]
         end
         @testset "xcorr with lagbounds" begin
             u = [1; zeros(5)]
             v = [1; zeros(5)]
-            @test xcorr2(u,v; center=false, lagbounds=(-1,1)) ≈ [0, 1, 0]
+            @test xcorr2(u,v; center=false,
+                         lagbounds=(-1,1),
+                         unbiased=false) ≈ [1, 0, 0]
         end
         @testset "xcorr with short u" begin
             u = [1, 0]
             v = [1, 0, 0]
-            @test xcorr2(u,v; center=false, unbiased=false) ≈ [0, 0, 1, 0]
+            @test xcorr2(u,v; center=false, unbiased=false) ≈ [1, 0, 0, 0]
         end
         @testset "xcorr with short v" begin
             u = [1, 0, 0]
             v = [1, 0]
-            @test xcorr2(u,v; center=false, unbiased=false) ≈ [0, 1, 0, 0]
+            @test xcorr2(u,v; center=false, unbiased=false) ≈ [1, 0, 0, 0]
         end
     end
 
