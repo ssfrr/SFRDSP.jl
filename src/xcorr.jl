@@ -136,8 +136,8 @@ function xcorr2(u,v;
     for i in eachindex(uspec)
         @inbounds uspec[i] *= conj(vspec[i])
         if phat
-            @inbounds mag = sqrt(abs2(uspec[i]) * abs2(vspec[i]))
-            @inbounds mag > magthresh && (uspec[i] /= norm)
+            @inbounds mag = abs(uspec[i])
+            @inbounds mag > magthresh && (uspec[i] /= mag)
         end
     end
 
