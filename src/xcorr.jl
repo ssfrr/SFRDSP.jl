@@ -169,3 +169,28 @@ function xcorr2(u,v;
     end
     result
 end
+
+"""
+    xc_align(x, y, lagbounds; phat=true; add_noise=phat)
+
+Returns `(vx, vy, os)` with views into `x` and `y` that are aligned to maximize the
+cross-correlation, as well as delay (in samples) of `y` relative to `x`. The views will
+be of equal length.
+
+`lagbounds` should be a `Tuple` with the minimum and maximum shift of `y` relative to
+`x`.
+`phat` enables the GCC-PHAT algorithm for sharper cross-correlations
+"""
+function xc_align(x, y, lagbounds; phat=true)
+    xc = xcorr2(y, x; phat=phat, lagbounds=lagbounds)
+    offset = findmax(abs2.(xc))[2] + lagbounds[1] - 1
+    vx, vy = if offset >= 0
+        L = min(length(x), length(y)-offset)
+        @views x[1:L], y[(1:L).+offset]
+    else
+        L = min(length(x)+offset, length(y))
+        @views x[(1:L).-offset], y[1:L]
+    end
+
+    vx, vy, offset
+end

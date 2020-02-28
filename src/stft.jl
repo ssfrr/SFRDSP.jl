@@ -35,7 +35,10 @@ and make the output easier to reason about:
 Note that the round-trip may introduce some zero-padding at the end.
 """
 
-# TODO: support windows longer than nfft
+# TODO: support windows longer than nfft - alternatively support windows with
+# padding in the middle where the window length is still nfft. They should be
+# equivilent ways to do the same thing, though maybe `stft` and `istft` will need
+# to handle them specially...
 # TODO: add options for boundary conditions so you don't get big bursts
 # in the STFT at the beginning and end for truncated signals
 """

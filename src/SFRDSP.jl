@@ -8,7 +8,7 @@ using SampledSignals
 
 export stft2, istft2
 export cubic
-export xcorr2, circ_xcorr2
+export xcorr2, circ_xcorr2, xc_align
 export circ_smooth, circ_resample, circ_conv
 export noise_psd
 export fit_ir, IRFitException

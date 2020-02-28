@@ -73,4 +73,26 @@ using DSP
 
     end
 
+    @testset "xc_align" begin
+        x = [zeros(3); 1; zeros(7)]
+        y = [zeros(5); 1; zeros(5)]
+        vx, vy, os = xc_align(x, y, (-3,3))
+        @test vx ≈ vy
+        @test os == 2
+
+        vx, vy, os = xc_align(y, x, (-3,3))
+        @test vx ≈ vy
+        @test os == -2
+
+        x = [zeros(3); 1; zeros(7)]
+        y = [zeros(5); 1; zeros(7)]
+        vx, vy, os = xc_align(x, y, (-3,3))
+        @test vx ≈ vy
+        @test os == 2
+
+        vx, vy, os = xc_align(y, x, (-3,3))
+        @test vx ≈ vy
+        @test os == -2
+    end
+
 end
