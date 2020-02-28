@@ -28,7 +28,7 @@ function noise_psd(X::AbstractMatrix{<:Complex}, smoothing, framerate)
         L += 1
     end
     win = gaussian(L, 0.14)
-    win ./= sum(x->x^2, win)
+    win ./= sum(win)
     map(1:size(X, 1)) do band
         # we skip the last STFT frame because it is often lower-power due to
         # being only partially-filled. Note that it would be more correct to
