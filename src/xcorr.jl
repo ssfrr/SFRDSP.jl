@@ -171,7 +171,7 @@ function xcorr2(u,v;
 end
 
 """
-    xc_align(x, y, lagbounds; phat=true; add_noise=phat)
+    xc_align(x, y, lagbounds; phat=true)
 
 Returns `(vx, vy, os)` with views into `x` and `y` that are aligned to maximize the
 cross-correlation, as well as delay (in samples) of `y` relative to `x`. The views will
